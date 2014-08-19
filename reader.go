@@ -79,6 +79,17 @@ func (r *reader) WriteTo(w io.Writer) (int64, error) {
 	return n, err
 }
 
+// Reset discards internal state and sets the underlying reader to r.  Reset
+// does not alter the reader's verification of checksums.  After Reset returns
+// the reader is equivalent to one returned by NewReader.  Reusing readers with
+// Reset can significantly reduce allocation overhead in applications making
+// heavy use of snappy framed format streams.
+func (r *reader) Reset(rnew io.Reader) {
+	r.err = nil
+	r.reader = rnew
+	r.buf.Truncate(0)
+}
+
 func (r *reader) read(b []byte) (int, error) {
 	n, err := r.buf.Read(b)
 	r.err = err

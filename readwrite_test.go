@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"io"
 	"io/ioutil"
+	"sync"
 	"testing"
 )
 
@@ -168,6 +169,12 @@ func BenchmarkBufferedWriterManpage(b *testing.B) {
 func BenchmarkBufferedWriterManpageNoCopy(b *testing.B) {
 	benchmarkBufferedWriterBytesNoCopy(b, testDataMan)
 }
+func BenchmarkBufferedWriterManpageNoReset(b *testing.B) {
+	benchmarkBufferedWriterBytesNoReset(b, testDataMan)
+}
+func BenchmarkBufferedWriterManpagePool(b *testing.B) {
+	benchmarkBufferedWriterBytesPool(b, testDataMan)
+}
 
 func BenchmarkWriterJSON(b *testing.B) {
 	benchmarkWriterBytes(b, testDataJSON)
@@ -177,6 +184,12 @@ func BenchmarkBufferedWriterJSON(b *testing.B) {
 }
 func BenchmarkBufferedWriterJSONNoCopy(b *testing.B) {
 	benchmarkBufferedWriterBytesNoCopy(b, testDataJSON)
+}
+func BenchmarkBufferedWriterJSONNoReset(b *testing.B) {
+	benchmarkBufferedWriterBytesNoReset(b, testDataJSON)
+}
+func BenchmarkBufferedWriterJSONPool(b *testing.B) {
+	benchmarkBufferedWriterBytesPool(b, testDataJSON)
 }
 
 // BenchmarkWriterRandom tests performance encoding effectively uncompressable
@@ -190,6 +203,12 @@ func BenchmarkBufferedWriterRandom(b *testing.B) {
 func BenchmarkBufferedWriterRandomNoCopy(b *testing.B) {
 	benchmarkBufferedWriterBytesNoCopy(b, randBytes(b, TestFileSize))
 }
+func BenchmarkBufferedWriterRandomNoReset(b *testing.B) {
+	benchmarkBufferedWriterBytesNoReset(b, randBytes(b, TestFileSize))
+}
+func BenchmarkBufferedWriterRandomPool(b *testing.B) {
+	benchmarkBufferedWriterBytesPool(b, randBytes(b, TestFileSize))
+}
 
 // BenchmarkWriterConstant tests performance encoding maximally compressible
 // data.
@@ -202,26 +221,60 @@ func BenchmarkBufferedWriterConstant(b *testing.B) {
 func BenchmarkBufferedWriterConstantNoCopy(b *testing.B) {
 	benchmarkBufferedWriterBytesNoCopy(b, make([]byte, TestFileSize))
 }
+func BenchmarkBufferedWriterConstantNoReset(b *testing.B) {
+	benchmarkBufferedWriterBytesNoReset(b, make([]byte, TestFileSize))
+}
+func BenchmarkBufferedWriterConstantPool(b *testing.B) {
+	benchmarkBufferedWriterBytesPool(b, make([]byte, TestFileSize))
+}
 
 func benchmarkWriterBytes(b *testing.B, p []byte) {
+	w := NewWriter(ioutil.Discard).(*writer)
+	wcloser := &nopWriteCloser{w}
 	enc := func() io.WriteCloser {
 		// wrap the normal writer so that it has a noop Close method.  writer
 		// does not implement ReaderFrom so this does not impact performance.
-		return &nopWriteCloser{NewWriter(ioutil.Discard)}
+		w.Reset(ioutil.Discard)
+		return wcloser
 	}
 	benchmarkEncode(b, enc, p)
 }
 func benchmarkBufferedWriterBytes(b *testing.B, p []byte) {
+	w := NewBufferedWriter(ioutil.Discard)
 	enc := func() io.WriteCloser {
 		// the writer's ReaderFrom implemention will be used in the benchmark.
-		return NewBufferedWriter(ioutil.Discard)
+		w.Reset(ioutil.Discard)
+		return w
 	}
 	benchmarkEncode(b, enc, p)
 }
 func benchmarkBufferedWriterBytesNoCopy(b *testing.B, p []byte) {
+	w := NewBufferedWriter(ioutil.Discard)
+	wnocopy := &writeCloserNoCopy{w}
 	enc := func() io.WriteCloser {
 		// the writer is wrapped as to hide it's ReaderFrom implemention.
-		return &writeCloserNoCopy{NewBufferedWriter(ioutil.Discard)}
+		w.Reset(ioutil.Discard)
+		return wnocopy
+	}
+	benchmarkEncode(b, enc, p)
+}
+func benchmarkBufferedWriterBytesNoReset(b *testing.B, p []byte) {
+	enc := func() io.WriteCloser {
+		// allocation is performed every iteration
+		return NewBufferedWriter(ioutil.Discard)
+	}
+	benchmarkEncode(b, enc, p)
+}
+func benchmarkBufferedWriterBytesPool(b *testing.B, p []byte) {
+	pool := &sync.Pool{
+		New: func() interface{} {
+			return NewBufferedWriter(ioutil.Discard)
+		},
+	}
+	enc := func() io.WriteCloser {
+		w := pool.Get().(*BufferedWriter)
+		w.Reset(ioutil.Discard)
+		return &poolBufferedWriter{pool, w}
 	}
 	benchmarkEncode(b, enc, p)
 }
@@ -258,6 +311,12 @@ func BenchmarkReaderManpage_buffered(b *testing.B) {
 func BenchmarkReaderManpageNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, testDataMan)
 }
+func BenchmarkReaderManpageNoReset(b *testing.B) {
+	encodeAndBenchmarkReaderNoReset(b, testDataMan)
+}
+func BenchmarkReaderManpagePool(b *testing.B) {
+	encodeAndBenchmarkReaderPool(b, testDataMan)
+}
 
 func BenchmarkReaderJSON(b *testing.B) {
 	encodeAndBenchmarkReader(b, testDataJSON)
@@ -267,6 +326,12 @@ func BenchmarkReaderJSON_buffered(b *testing.B) {
 }
 func BenchmarkReaderJSONNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, testDataJSON)
+}
+func BenchmarkReaderJSONNoReset(b *testing.B) {
+	encodeAndBenchmarkReaderNoReset(b, testDataJSON)
+}
+func BenchmarkReaderJSONPool(b *testing.B) {
+	encodeAndBenchmarkReaderPool(b, testDataJSON)
 }
 
 // BenchmarkReaderRandom tests decoding of effectively uncompressable data.
@@ -279,6 +344,12 @@ func BenchmarkReaderRandom_buffered(b *testing.B) {
 func BenchmarkReaderRandomNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, randBytes(b, TestFileSize))
 }
+func BenchmarkReaderRandomNoReset(b *testing.B) {
+	encodeAndBenchmarkReaderNoReset(b, randBytes(b, TestFileSize))
+}
+func BenchmarkReaderRandomPool(b *testing.B) {
+	encodeAndBenchmarkReaderPool(b, randBytes(b, TestFileSize))
+}
 
 // BenchmarkReaderConstant tests decoding of maximally compressible data.
 func BenchmarkReaderConstant(b *testing.B) {
@@ -289,6 +360,12 @@ func BenchmarkReaderConstant_buffered(b *testing.B) {
 }
 func BenchmarkReaderConstantNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, make([]byte, TestFileSize))
+}
+func BenchmarkReaderConstantNoReset(b *testing.B) {
+	encodeAndBenchmarkReaderNoReset(b, make([]byte, TestFileSize))
+}
+func BenchmarkReaderConstantPool(b *testing.B) {
+	encodeAndBenchmarkReaderPool(b, make([]byte, TestFileSize))
 }
 
 // encodeAndBenchmarkReader is a helper that benchmarks the package
@@ -301,8 +378,10 @@ func encodeAndBenchmarkReader(b *testing.B, p []byte) {
 	if err != nil {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
-	dec := func(r io.Reader) io.Reader {
-		return NewReader(r, VerifyChecksum)
+	r := NewReader(nil, true).(*reader)
+	dec := func(rnew io.Reader) io.ReadCloser {
+		r.Reset(rnew)
+		return ioutil.NopCloser(r)
 	}
 	benchmarkDecode(b, dec, int64(len(p)), enc)
 }
@@ -317,8 +396,10 @@ func encodeAndBenchmarkReader_buffered(b *testing.B, p []byte) {
 	if err != nil {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
-	dec := func(r io.Reader) io.Reader {
-		return NewReader(r, VerifyChecksum)
+	r := NewReader(nil, true).(*reader)
+	dec := func(rnew io.Reader) io.ReadCloser {
+		r.Reset(rnew)
+		return ioutil.NopCloser(r)
 	}
 	benchmarkDecode(b, dec, int64(len(p)), enc)
 }
@@ -335,8 +416,52 @@ func encodeAndBenchmarkReaderNoCopy(b *testing.B, p []byte) {
 	if err != nil {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
-	dec := func(r io.Reader) io.Reader {
+	r := NewReader(nil, true).(*reader)
+	rnocopy := ioutil.NopCloser(r)
+	dec := func(rnew io.Reader) io.ReadCloser {
+		r.Reset(rnew)
+		return ioutil.NopCloser(rnocopy)
+	}
+	benchmarkDecode(b, dec, int64(len(p)), enc)
+}
+
+// encodeAndBenchmarkReaderNoReset is a helper that benchmarks the
+// package reader's performance given p encoded as a snappy framed stream.
+// encodeAndBenchmarReaderNoReset allocates a new reader in each iteration.
+//
+// encodeAndBenchmarkReaderNoReset benchmarks decoding of streams that
+// contain at most one short frame (at the end).
+func encodeAndBenchmarkReaderNoReset(b *testing.B, p []byte) {
+	enc, err := encodeStreamBytes(p, true)
+	if err != nil {
+		b.Fatalf("pre-benchmark compression: %v", err)
+	}
+	dec := func(r io.Reader) io.ReadCloser {
 		return ioutil.NopCloser(NewReader(r, VerifyChecksum))
+	}
+	benchmarkDecode(b, dec, int64(len(p)), enc)
+}
+
+// encodeAndBenchmarkReaderPool is a helper that benchmarks the package
+// reader's performance given p encoded as a snappy framed stream.
+// encodeAndBenchmarkReaderPool uses a sync.Pool to avoid extra allocations.
+//
+// encodeAndBenchmarkReaderNoReset benchmarks decoding of streams that
+// contain at most one short frame (at the end).
+func encodeAndBenchmarkReaderPool(b *testing.B, p []byte) {
+	enc, err := encodeStreamBytes(p, true)
+	if err != nil {
+		b.Fatalf("pre-benchmark compression: %v", err)
+	}
+	pool := &sync.Pool{
+		New: func() interface{} {
+			return NewReader(nil, VerifyChecksum)
+		},
+	}
+	dec := func(r io.Reader) io.ReadCloser {
+		pr := pool.Get().(*reader)
+		pr.Reset(r)
+		return &poolReader{pool, pr}
 	}
 	benchmarkDecode(b, dec, int64(len(p)), enc)
 }
@@ -344,7 +469,7 @@ func encodeAndBenchmarkReaderNoCopy(b *testing.B, p []byte) {
 // benchmarkDecode runs a benchmark that repeatedly decoded snappy
 // framed bytes enc.  The length of the decoded result in each iteration must
 // equal size.
-func benchmarkDecode(b *testing.B, dec func(io.Reader) io.Reader, size int64, enc []byte) {
+func benchmarkDecode(b *testing.B, dec func(io.Reader) io.ReadCloser, size int64, enc []byte) {
 	b.SetBytes(int64(len(enc))) // BUG this is probably wrong
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -421,5 +546,30 @@ type nopWriteCloser struct {
 }
 
 func (w *nopWriteCloser) Close() error {
+	return nil
+}
+
+type poolBufferedWriter struct {
+	p *sync.Pool
+	*BufferedWriter
+}
+
+func (r *poolBufferedWriter) Close() error {
+	err := r.BufferedWriter.Close()
+	r.BufferedWriter.Reset(nil)
+	r.p.Put(r.BufferedWriter)
+	r.BufferedWriter = nil
+	return err
+}
+
+type poolReader struct {
+	p *sync.Pool
+	*reader
+}
+
+func (r *poolReader) Close() error {
+	r.reader.Reset(nil)
+	r.p.Put(r.reader)
+	r.reader = nil
 	return nil
 }

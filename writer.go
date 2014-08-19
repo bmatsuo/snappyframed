@@ -57,6 +57,16 @@ func (w *BufferedWriter) ReadFrom(r io.Reader) (int64, error) {
 	return n, w.err
 }
 
+// Reset discards internal state and sets the underlying writer to wnew.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reusing writers with Reset can significantly reduce allocation overhead in
+// applications making heavy use of snappy framed format streams.
+func (w *BufferedWriter) Reset(wnew io.Writer) {
+	w.err = nil
+	w.w.Reset(wnew)
+	w.bw.Reset(w.w)
+}
+
 // Write buffers p internally, encoding and writing a block to the underlying
 // buffer if the buffer grows beyond MaxBlockSize bytes.  The returned int
 // will be 0 if there was an error and len(p) otherwise.
@@ -93,9 +103,6 @@ func (w *BufferedWriter) Close() error {
 	}
 
 	w.err = w.bw.Flush()
-	w.w = nil
-	w.bw = nil
-
 	if w.err != nil {
 		return w.err
 	}
@@ -132,6 +139,16 @@ func NewWriter(w io.Writer) io.Writer {
 		hdr: make([]byte, 8),
 		dst: make([]byte, 4096),
 	}
+}
+
+// Reset discards internal state and sets the underlying writer to wnew.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reusing writers with Reset can significantly reduce allocation overhead in
+// applications making heavy use of snappy framed format streams.
+func (w *writer) Reset(wnew io.Writer) {
+	w.err = nil
+	w.sentStreamID = false
+	w.writer = wnew
 }
 
 func (w *writer) Write(p []byte) (int, error) {
