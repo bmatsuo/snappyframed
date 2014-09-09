@@ -1,4 +1,4 @@
-package snappystream
+package snappyframed
 
 var testDataMan = []byte(`
 .TH XARGS 1L \" -*- nroff -*-

@@ -1,4 +1,4 @@
-package snappystream
+package snappyframed
 
 import (
 	"bufio"
