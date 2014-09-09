@@ -20,8 +20,7 @@ type Reader struct {
 
 	err error
 
-	seenStreamID   bool
-	verifyChecksum bool
+	seenStreamID bool
 
 	buf bytes.Buffer
 	hdr []byte
@@ -45,11 +44,9 @@ type Reader struct {
 // For each Read, the returned length will be up to the lesser of len(b) or 65536
 // decompressed bytes, regardless of the length of *compressed* bytes read
 // from the wrapped io.Reader.
-func NewReader(r io.Reader, verifyChecksum bool) *Reader {
+func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		reader: r,
-
-		verifyChecksum: verifyChecksum,
 
 		hdr: make([]byte, 4),
 		src: make([]byte, 4096),
@@ -181,12 +178,10 @@ func (r *Reader) decodeBlock(w io.Writer) (int, error) {
 		}
 		blockdata = r.dst
 	}
-	if r.verifyChecksum {
-		checksum := unmaskChecksum(uint32(crc32le[0]) | uint32(crc32le[1])<<8 | uint32(crc32le[2])<<16 | uint32(crc32le[3])<<24)
-		actualChecksum := crc32.Checksum(blockdata, crcTable)
-		if checksum != actualChecksum {
-			return 0, fmt.Errorf("checksum does not match %x != %x", checksum, actualChecksum)
-		}
+	checksum := unmaskChecksum(uint32(crc32le[0]) | uint32(crc32le[1])<<8 | uint32(crc32le[2])<<16 | uint32(crc32le[3])<<24)
+	actualChecksum := crc32.Checksum(blockdata, crcTable)
+	if checksum != actualChecksum {
+		return 0, fmt.Errorf("checksum does not match %x != %x", checksum, actualChecksum)
 	}
 	return w.Write(blockdata)
 }

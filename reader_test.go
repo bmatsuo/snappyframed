@@ -53,7 +53,7 @@ func TestReader_skippable(t *testing.T) {
 		t.Fatalf("write error: %v", err)
 	}
 
-	p, err := ioutil.ReadAll(NewReader(&buf, true))
+	p, err := ioutil.ReadAll(NewReader(&buf))
 	if err != nil {
 		t.Fatalf("read error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestReader_unskippable(t *testing.T) {
 		t.Fatalf("write error: %v", err)
 	}
 
-	_, err = ioutil.ReadAll(NewReader(&buf, true))
+	_, err = ioutil.ReadAll(NewReader(&buf))
 	if err == nil {
 		t.Fatalf("read success")
 	}
@@ -104,7 +104,7 @@ func TestReaderStreamID(t *testing.T) {
 	stream := buf.Bytes()
 
 	// sanity check: the stream can be decoded and starts with streamID
-	r := NewReader(bytes.NewReader(stream), true)
+	r := NewReader(bytes.NewReader(stream))
 	_, err = ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -115,7 +115,7 @@ func TestReaderStreamID(t *testing.T) {
 
 	// streamNoID is valid except for a missing the streamID block
 	streamNoID := bytes.TrimPrefix(stream, streamID)
-	r = NewReader(bytes.NewReader(streamNoID), true)
+	r = NewReader(bytes.NewReader(streamNoID))
 	n, err := r.Read(make([]byte, 1))
 	if err == nil {
 		t.Fatalf("read: expected an error reading input missing a stream identifier block")
@@ -141,7 +141,7 @@ func TestReader_maxPad(t *testing.T) {
 		opaqueChunk(0xfe, (1<<24)-1), // normal padding
 		compressedChunk(t, []byte(" is decoded successfully")),
 	}, nil))
-	r := NewReader(buf, true)
+	r := NewReader(buf)
 	p, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatalf("read error: %v", err)
@@ -160,7 +160,7 @@ func TestReader_maxSkippable(t *testing.T) {
 		opaqueChunk(0xce, (1<<24)-1), // reserved skippable chunk
 		compressedChunk(t, []byte(" is decoded successfully")),
 	}, nil))
-	r := NewReader(buf, true)
+	r := NewReader(buf)
 	p, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatalf("read error: %v", err)
@@ -179,7 +179,7 @@ func TestReader_maxBlock(t *testing.T) {
 		streamID,
 		compressedChunkGreaterN(t, MaxBlockSize),
 	}, nil))
-	r := NewReader(buf, true)
+	r := NewReader(buf)
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +194,7 @@ func TestReader_maxBlock(t *testing.T) {
 		streamID,
 		compressedChunk(t, make([]byte, MaxBlockSize+1)),
 	}, nil))
-	r = NewReader(buf, true)
+	r = NewReader(buf)
 	b, err = ioutil.ReadAll(r)
 	if err == nil {
 		t.Fatal("unexpected success")
@@ -217,7 +217,7 @@ func TestReader_maxUnskippable(t *testing.T) {
 		compressedChunk(t, []byte(" failure must be reported as such")),
 	}, nil))
 	p := make([]byte, len(prefix))
-	r := NewReader(buf, true)
+	r := NewReader(buf)
 	n, err := r.Read(p)
 	if err != nil {
 		t.Fatalf("read error: %v", err)
@@ -249,7 +249,7 @@ func TestReader_blockTooLarge(t *testing.T) {
 		streamID,
 		compressedChunk(t, make([]byte, (1<<24)-5)),
 	}, nil)
-	r := NewReader(bytes.NewBuffer(badstream), true)
+	r := NewReader(bytes.NewBuffer(badstream))
 	p := make([]byte, 1)
 	n, err := r.Read(p)
 	if err == nil {
@@ -265,7 +265,7 @@ func TestReader_blockTooLarge(t *testing.T) {
 		streamID,
 		uncompressedChunk(t, make([]byte, (1<<24)-5)),
 	}, nil)
-	r = NewReader(bytes.NewBuffer(badstream), true)
+	r = NewReader(bytes.NewBuffer(badstream))
 	p = make([]byte, 1)
 	n, err = r.Read(p)
 	if err == nil {
@@ -283,7 +283,7 @@ func TestReader_corruption(t *testing.T) {
 	corruptID = bytes.Replace(streamID, []byte("p"), []byte("P"), -1) // corrupt "sNaPpY" data
 	badstream := corruptID
 
-	r := NewReader(bytes.NewBuffer(badstream), true)
+	r := NewReader(bytes.NewBuffer(badstream))
 	p := make([]byte, 1)
 	n, err := r.Read(p)
 	if err == nil {
@@ -300,7 +300,7 @@ func TestReader_corruption(t *testing.T) {
 	corruptID[1] = 0x00
 	badstream = corruptID
 
-	r = NewReader(bytes.NewBuffer(badstream), true)
+	r = NewReader(bytes.NewBuffer(badstream))
 	p = make([]byte, 1)
 	n, err = r.Read(p)
 	if err == nil {
@@ -324,7 +324,7 @@ func TestReader_corruption(t *testing.T) {
 		corrupt,
 	}, nil)
 
-	r = NewReader(bytes.NewBuffer(badstream), true)
+	r = NewReader(bytes.NewBuffer(badstream))
 	p = make([]byte, 1)
 	n, err = r.Read(p)
 	if err == nil {
@@ -344,7 +344,7 @@ func TestReader_corruption(t *testing.T) {
 		corrupt,
 	}, nil)
 
-	r = NewReader(bytes.NewBuffer(badstream), true)
+	r = NewReader(bytes.NewBuffer(badstream))
 	p = make([]byte, 1)
 	n, err = r.Read(p)
 	if err == nil {
@@ -409,7 +409,7 @@ func TestReader_unexpectedEOF(t *testing.T) {
 			opaqueChunk(0x03, 100)[:5],
 		}, nil),
 	} {
-		r := NewReader(bytes.NewReader(test), true)
+		r := NewReader(bytes.NewReader(test))
 		n, err := r.Read(decodeBuffer[:])
 		if err == nil {
 			t.Errorf("read bad streamID: expected error")
@@ -537,7 +537,7 @@ func TestReaderWriteTo(t *testing.T) {
 		t.Fatalf("encode: %v", err)
 	}
 
-	r := NewReader(&encbuf, true)
+	r := NewReader(&encbuf)
 	n64, err := r.WriteTo(&decbuf)
 	if err != nil {
 		t.Fatalf("decode: %v", err)

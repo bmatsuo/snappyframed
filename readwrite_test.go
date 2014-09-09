@@ -40,7 +40,7 @@ func testWriteThenRead(t *testing.T, name string, bs []byte) {
 
 	enclen := buf.Len()
 
-	r := NewReader(&buf, true)
+	r := NewReader(&buf)
 	gotbs, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Errorf("read %v: %v", name, err)
@@ -83,7 +83,7 @@ func TestWriterChunk(t *testing.T) {
 	in := make([]byte, 128000)
 
 	w := NewWriter(&buf)
-	r := NewReader(&buf, VerifyChecksum)
+	r := NewReader(&buf)
 
 	n, err := w.Write(in)
 	if err != nil {
@@ -219,7 +219,7 @@ func encodeAndBenchmarkReader(b *testing.B, p []byte) {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
 	dec := func(r io.Reader) io.Reader {
-		return NewReader(r, VerifyChecksum)
+		return NewReader(r)
 	}
 	benchmarkDecode(b, dec, int64(len(p)), enc)
 }
@@ -237,7 +237,7 @@ func encodeAndBenchmarkReaderNoCopy(b *testing.B, p []byte) {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
 	dec := func(r io.Reader) io.Reader {
-		return ioutil.NopCloser(NewReader(r, VerifyChecksum))
+		return ioutil.NopCloser(NewReader(r))
 	}
 	benchmarkDecode(b, dec, int64(len(p)), enc)
 }

@@ -28,9 +28,6 @@ const MaxBlockSize = 65536
 // block.
 var maxEncodedBlockSize = uint32(snappy.MaxEncodedLen(MaxBlockSize))
 
-const VerifyChecksum = true
-const SkipVerifyChecksum = false
-
 // Block types defined by the snappy framed format specification.
 const (
 	blockCompressed       = 0x00
