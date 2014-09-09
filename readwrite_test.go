@@ -32,42 +32,6 @@ func testWriteThenRead(t *testing.T, name string, bs []byte) {
 		t.Errorf("write %v: wrote %d bytes (!= %d)", name, n, len(bs))
 		return
 	}
-
-	enclen := buf.Len()
-
-	r := NewReader(&buf, true)
-	gotbs, err := ioutil.ReadAll(r)
-	if err != nil {
-		t.Errorf("read %v: %v", name, err)
-		return
-	}
-	n = int64(len(gotbs))
-	if n != int64(len(bs)) {
-		t.Errorf("read %v: read %d bytes (!= %d)", name, n, len(bs))
-		return
-	}
-
-	if !bytes.Equal(gotbs, bs) {
-		t.Errorf("%v: unequal decompressed content", name)
-		return
-	}
-
-	c := float64(len(bs)) / float64(enclen)
-	t.Logf("%v compression ratio %.03g (%d byte reduction)", name, c, len(bs)-enclen)
-}
-
-func testBufferedWriteThenRead(t *testing.T, name string, bs []byte) {
-	var buf bytes.Buffer
-	w := NewBufferedWriter(&buf)
-	n, err := io.Copy(w, dummyBytesReader(bs))
-	if err != nil {
-		t.Errorf("write %v: %v", name, err)
-		return
-	}
-	if n != int64(len(bs)) {
-		t.Errorf("write %v: wrote %d bytes (!= %d)", name, n, len(bs))
-		return
-	}
 	err = w.Close()
 	if err != nil {
 		t.Errorf("close %v: %v", name, err)
@@ -113,22 +77,6 @@ func TestWriterReader(t *testing.T) {
 
 }
 
-func TestBufferedWriterReader(t *testing.T) {
-	testBufferedWriteThenRead(t, "simple", []byte("test"))
-	testBufferedWriteThenRead(t, "manpage", testDataMan)
-	testBufferedWriteThenRead(t, "json", testDataJSON)
-
-	p := make([]byte, TestFileSize)
-	testBufferedWriteThenRead(t, "constant", p)
-
-	_, err := rand.Read(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	testBufferedWriteThenRead(t, "random", p)
-
-}
-
 func TestWriterChunk(t *testing.T) {
 	var buf bytes.Buffer
 
@@ -162,21 +110,15 @@ func TestWriterChunk(t *testing.T) {
 func BenchmarkWriterManpage(b *testing.B) {
 	benchmarkWriterBytes(b, testDataMan)
 }
-func BenchmarkBufferedWriterManpage(b *testing.B) {
-	benchmarkBufferedWriterBytes(b, testDataMan)
-}
-func BenchmarkBufferedWriterManpageNoCopy(b *testing.B) {
-	benchmarkBufferedWriterBytesNoCopy(b, testDataMan)
+func BenchmarkWriterManpageNoCopy(b *testing.B) {
+	benchmarkWriterBytesNoCopy(b, testDataMan)
 }
 
 func BenchmarkWriterJSON(b *testing.B) {
 	benchmarkWriterBytes(b, testDataJSON)
 }
-func BenchmarkBufferedWriterJSON(b *testing.B) {
-	benchmarkBufferedWriterBytes(b, testDataJSON)
-}
-func BenchmarkBufferedWriterJSONNoCopy(b *testing.B) {
-	benchmarkBufferedWriterBytesNoCopy(b, testDataJSON)
+func BenchmarkWriterJSONNoCopy(b *testing.B) {
+	benchmarkWriterBytesNoCopy(b, testDataJSON)
 }
 
 // BenchmarkWriterRandom tests performance encoding effectively uncompressable
@@ -184,11 +126,8 @@ func BenchmarkBufferedWriterJSONNoCopy(b *testing.B) {
 func BenchmarkWriterRandom(b *testing.B) {
 	benchmarkWriterBytes(b, randBytes(b, TestFileSize))
 }
-func BenchmarkBufferedWriterRandom(b *testing.B) {
-	benchmarkBufferedWriterBytes(b, randBytes(b, TestFileSize))
-}
-func BenchmarkBufferedWriterRandomNoCopy(b *testing.B) {
-	benchmarkBufferedWriterBytesNoCopy(b, randBytes(b, TestFileSize))
+func BenchmarkWriterRandomNoCopy(b *testing.B) {
+	benchmarkWriterBytesNoCopy(b, randBytes(b, TestFileSize))
 }
 
 // BenchmarkWriterConstant tests performance encoding maximally compressible
@@ -196,11 +135,8 @@ func BenchmarkBufferedWriterRandomNoCopy(b *testing.B) {
 func BenchmarkWriterConstant(b *testing.B) {
 	benchmarkWriterBytes(b, make([]byte, TestFileSize))
 }
-func BenchmarkBufferedWriterConstant(b *testing.B) {
-	benchmarkBufferedWriterBytes(b, make([]byte, TestFileSize))
-}
-func BenchmarkBufferedWriterConstantNoCopy(b *testing.B) {
-	benchmarkBufferedWriterBytesNoCopy(b, make([]byte, TestFileSize))
+func BenchmarkWriterConstantNoCopy(b *testing.B) {
+	benchmarkWriterBytesNoCopy(b, make([]byte, TestFileSize))
 }
 
 func benchmarkWriterBytes(b *testing.B, p []byte) {
@@ -211,17 +147,10 @@ func benchmarkWriterBytes(b *testing.B, p []byte) {
 	}
 	benchmarkEncode(b, enc, p)
 }
-func benchmarkBufferedWriterBytes(b *testing.B, p []byte) {
-	enc := func() io.WriteCloser {
-		// the writer's ReaderFrom implemention will be used in the benchmark.
-		return NewBufferedWriter(ioutil.Discard)
-	}
-	benchmarkEncode(b, enc, p)
-}
-func benchmarkBufferedWriterBytesNoCopy(b *testing.B, p []byte) {
+func benchmarkWriterBytesNoCopy(b *testing.B, p []byte) {
 	enc := func() io.WriteCloser {
 		// the writer is wrapped as to hide it's ReaderFrom implemention.
-		return &writeCloserNoCopy{NewBufferedWriter(ioutil.Discard)}
+		return &writeCloserNoCopy{NewWriter(ioutil.Discard)}
 	}
 	benchmarkEncode(b, enc, p)
 }
@@ -252,29 +181,20 @@ func benchmarkEncode(b *testing.B, enc func() io.WriteCloser, bs []byte) {
 func BenchmarkReaderManpage(b *testing.B) {
 	encodeAndBenchmarkReader(b, testDataMan)
 }
-func BenchmarkReaderManpage_buffered(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, testDataMan)
-}
 func BenchmarkReaderManpageNoCopy(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, testDataMan)
+	encodeAndBenchmarkReader(b, testDataMan)
 }
 
 func BenchmarkReaderJSON(b *testing.B) {
 	encodeAndBenchmarkReader(b, testDataJSON)
 }
-func BenchmarkReaderJSON_buffered(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, testDataJSON)
-}
 func BenchmarkReaderJSONNoCopy(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, testDataJSON)
+	encodeAndBenchmarkReader(b, testDataJSON)
 }
 
 // BenchmarkReaderRandom tests decoding of effectively uncompressable data.
 func BenchmarkReaderRandom(b *testing.B) {
 	encodeAndBenchmarkReader(b, randBytes(b, TestFileSize))
-}
-func BenchmarkReaderRandom_buffered(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, randBytes(b, TestFileSize))
 }
 func BenchmarkReaderRandomNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, randBytes(b, TestFileSize))
@@ -283,9 +203,6 @@ func BenchmarkReaderRandomNoCopy(b *testing.B) {
 // BenchmarkReaderConstant tests decoding of maximally compressible data.
 func BenchmarkReaderConstant(b *testing.B) {
 	encodeAndBenchmarkReader(b, make([]byte, TestFileSize))
-}
-func BenchmarkReaderConstant_buffered(b *testing.B) {
-	encodeAndBenchmarkReader_buffered(b, make([]byte, TestFileSize))
 }
 func BenchmarkReaderConstantNoCopy(b *testing.B) {
 	encodeAndBenchmarkReaderNoCopy(b, make([]byte, TestFileSize))
@@ -298,22 +215,6 @@ func BenchmarkReaderConstantNoCopy(b *testing.B) {
 // (multiple) short frames.
 func encodeAndBenchmarkReader(b *testing.B, p []byte) {
 	enc, err := encodeStreamBytes(p, false)
-	if err != nil {
-		b.Fatalf("pre-benchmark compression: %v", err)
-	}
-	dec := func(r io.Reader) io.Reader {
-		return NewReader(r, VerifyChecksum)
-	}
-	benchmarkDecode(b, dec, int64(len(p)), enc)
-}
-
-// encodeAndBenchmarkReader_buffered is a helper that benchmarks the
-// package reader's performance given p encoded as a snappy framed stream.
-//
-// encodeAndBenchmarkReader_buffered benchmarks decoding of streams that
-// contain at most one short frame (at the end).
-func encodeAndBenchmarkReader_buffered(b *testing.B, p []byte) {
-	enc, err := encodeStreamBytes(p, true)
 	if err != nil {
 		b.Fatalf("pre-benchmark compression: %v", err)
 	}
@@ -381,7 +282,7 @@ func encodeStream(r io.Reader, buffer bool) ([]byte, error) {
 		return buf.Bytes(), nil
 	}
 
-	w := NewBufferedWriter(&buf)
+	w := NewWriter(&buf)
 	_, err := io.Copy(w, r)
 	if err != nil {
 		return nil, err

@@ -15,7 +15,7 @@ import (
 // signifies that the source byte stream is not snappy framed.
 var errMissingStreamID = fmt.Errorf("missing stream identifier")
 
-type reader struct {
+type Reader struct {
 	reader io.Reader
 
 	err error
@@ -45,8 +45,8 @@ type reader struct {
 // For each Read, the returned length will be up to the lesser of len(b) or 65536
 // decompressed bytes, regardless of the length of *compressed* bytes read
 // from the wrapped io.Reader.
-func NewReader(r io.Reader, verifyChecksum bool) io.Reader {
-	return &reader{
+func NewReader(r io.Reader, verifyChecksum bool) *Reader {
+	return &Reader{
 		reader: r,
 
 		verifyChecksum: verifyChecksum,
@@ -60,7 +60,7 @@ func NewReader(r io.Reader, verifyChecksum bool) io.Reader {
 // WriteTo implements the io.WriterTo interface used by io.Copy.  It writes
 // decoded data from the underlying reader to w.  WriteTo returns the number of
 // bytes written along with any error encountered.
-func (r *reader) WriteTo(w io.Writer) (int64, error) {
+func (r *Reader) WriteTo(w io.Writer) (int64, error) {
 	n, err := r.buf.WriteTo(w)
 	if err != nil {
 		return n, err
@@ -79,13 +79,13 @@ func (r *reader) WriteTo(w io.Writer) (int64, error) {
 	return n, err
 }
 
-func (r *reader) read(b []byte) (int, error) {
+func (r *Reader) read(b []byte) (int, error) {
 	n, err := r.buf.Read(b)
 	r.err = err
 	return n, err
 }
 
-func (r *reader) Read(b []byte) (int, error) {
+func (r *Reader) Read(b []byte) (int, error) {
 	if r.err != nil {
 		return 0, r.err
 	}
@@ -104,7 +104,7 @@ func (r *reader) Read(b []byte) (int, error) {
 	return r.read(b)
 }
 
-func (r *reader) nextFrame(w io.Writer) (int, error) {
+func (r *Reader) nextFrame(w io.Writer) (int, error) {
 	for {
 		// read the 4-byte snappy frame header
 		_, err := io.ReadFull(r.reader, r.hdr)
@@ -153,7 +153,7 @@ func (r *reader) nextFrame(w io.Writer) (int, error) {
 
 // decodeDataBlock assumes r.hdr[0] to be either blockCompressed or
 // blockUncompressed.
-func (r *reader) decodeBlock(w io.Writer) (int, error) {
+func (r *Reader) decodeBlock(w io.Writer) (int, error) {
 	// read compressed block data and determine if uncompressed data is too
 	// large.
 	buf, err := r.readBlock()
@@ -191,7 +191,7 @@ func (r *reader) decodeBlock(w io.Writer) (int, error) {
 	return w.Write(blockdata)
 }
 
-func (r *reader) readStreamID() error {
+func (r *Reader) readStreamID() error {
 	// the length of the block is fixed so don't decode it from the header.
 	if !bytes.Equal(r.hdr, streamID[:4]) {
 		return fmt.Errorf("invalid stream identifier length")
@@ -209,13 +209,13 @@ func (r *reader) readStreamID() error {
 	return nil
 }
 
-func (r *reader) discardBlock() error {
+func (r *Reader) discardBlock() error {
 	length := uint64(decodeLength(r.hdr[1:]))
 	_, err := noeof64(io.CopyN(ioutil.Discard, r.reader, int64(length)))
 	return err
 }
 
-func (r *reader) readBlock() ([]byte, error) {
+func (r *Reader) readBlock() ([]byte, error) {
 	// check bounds on encoded length (+4 for checksum)
 	length := decodeLength(r.hdr[1:])
 	if length > (maxEncodedBlockSize + 4) {

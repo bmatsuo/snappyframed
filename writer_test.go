@@ -7,13 +7,13 @@ import (
 	"testing"
 )
 
-// This test ensures that all BufferedWriter methods fail after Close has been
+// This test ensures that all Writer methods fail after Close has been
 // called.
-func TestBufferedWriterClose(t *testing.T) {
-	w := NewBufferedWriter(ioutil.Discard)
+func TestWriterClose(t *testing.T) {
+	w := NewWriter(ioutil.Discard)
 	err := w.Close()
 	if err != nil {
-		log.Fatalf("closing empty BufferedWriter: %v", err)
+		log.Fatalf("closing empty Writer: %v", err)
 	}
 	err = w.Close()
 	if err == nil {
@@ -31,12 +31,12 @@ func TestBufferedWriterClose(t *testing.T) {
 
 // This test simply checks that buffering has an effect in a situation where it
 // is know it should.
-func TestBufferedWriter_compression(t *testing.T) {
+func TestWriter_compression(t *testing.T) {
 	p := []byte("hello snappystream!")
 	n := 10
 
 	var shortbuf bytes.Buffer
-	w := NewWriter(&shortbuf)
+	w := newWriter(&shortbuf)
 	for i := 0; i < n; i++ {
 		n, err := w.Write(p)
 		if err != nil {
@@ -48,7 +48,7 @@ func TestBufferedWriter_compression(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	bw := NewBufferedWriter(&buf)
+	bw := NewWriter(&buf)
 	for i := 0; i < n; i++ {
 		n, err := bw.Write(p)
 		if err != nil {
@@ -75,17 +75,17 @@ func TestBufferedWriter_compression(t *testing.T) {
 	bufc := float64(uncompressed) / float64(bufcompressed)
 	improved := bufc / c
 
-	t.Logf("BufferedWriter compression ratio %g (%.03g factor improvement over %g)", bufc, improved, c)
+	t.Logf("Writer compression ratio %g (%.03g factor improvement over %g)", bufc, improved, c)
 }
 
 // This tests ensures flushing after every write is equivalent to using
 // NewWriter directly.
-func TestBufferedWriterFlush(t *testing.T) {
+func TestWriterFlush(t *testing.T) {
 	p := []byte("hello snappystream!")
 	n := 10
 
 	var shortbuf bytes.Buffer
-	w := NewWriter(&shortbuf)
+	w := newWriter(&shortbuf)
 	for i := 0; i < n; i++ {
 		n, err := w.Write(p)
 		if err != nil {
@@ -97,7 +97,7 @@ func TestBufferedWriterFlush(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	bw := NewBufferedWriter(&buf)
+	bw := NewWriter(&buf)
 	for i := 0; i < n; i++ {
 		n, err := bw.Write(p)
 		if err != nil {

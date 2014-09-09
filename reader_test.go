@@ -17,34 +17,38 @@ import (
 func TestReader_skippable(t *testing.T) {
 	var buf bytes.Buffer
 	// write some blocks with injected padding/skippable blocks
-	w := NewWriter(&buf)
+	w := newWriter(&buf)
+	var err error
 	write := func(p []byte) (int, error) {
+		if err != nil {
+			return 0, err
+		}
 		return w.Write(p)
 	}
 	writepad := func(b byte, n int) (int, error) {
 		return buf.Write(opaqueChunk(b, n))
 	}
-	_, err := write([]byte("hello"))
+	write([]byte("hello"))
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	_, err = writepad(0xfe, 100) // normal padding
+	writepad(0xfe, 100) // normal padding
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	_, err = write([]byte(" "))
+	write([]byte(" "))
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	_, err = writepad(0xa0, 100) // reserved skippable block
+	writepad(0xa0, 100) // reserved skippable block
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	_, err = writepad(0xfe, MaxBlockSize) // normal padding
+	writepad(0xfe, MaxBlockSize) // normal padding
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	_, err = write([]byte("padding"))
+	write([]byte("padding"))
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
@@ -62,7 +66,7 @@ func TestReader_skippable(t *testing.T) {
 func TestReader_unskippable(t *testing.T) {
 	var buf bytes.Buffer
 	// write some blocks with injected padding/skippable blocks
-	w := NewWriter(&buf)
+	w := newWriter(&buf)
 	write := func(p []byte) (int, error) {
 		return w.Write(p)
 	}
@@ -91,10 +95,10 @@ func TestReader_unskippable(t *testing.T) {
 func TestReaderStreamID(t *testing.T) {
 	data := []byte("a snappy-framed data stream")
 	var buf bytes.Buffer
-	w := NewWriter(&buf)
+	w := newWriter(&buf)
 	_, err := w.Write(data)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("write: %v", err)
 	}
 
 	stream := buf.Bytes()
@@ -524,7 +528,7 @@ func TestReaderWriteTo(t *testing.T) {
 	var decbuf bytes.Buffer
 	msg := "hello copy interface"
 
-	w := NewWriter(&encbuf)
+	w := newWriter(&encbuf)
 	n, err := io.WriteString(w, msg)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
@@ -534,7 +538,7 @@ func TestReaderWriteTo(t *testing.T) {
 	}
 
 	r := NewReader(&encbuf, true)
-	n64, err := r.(*reader).WriteTo(&decbuf)
+	n64, err := r.WriteTo(&decbuf)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
