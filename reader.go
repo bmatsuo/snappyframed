@@ -15,6 +15,8 @@ import (
 // signifies that the source byte stream is not snappy framed.
 var errMissingStreamID = fmt.Errorf("missing stream identifier")
 
+// Reader is an io.Reader that can reads data decompressed from a compressed
+// snappy framed stream read with an underlying io.Reader.
 type Reader struct {
 	reader io.Reader
 
@@ -28,26 +30,16 @@ type Reader struct {
 	dst []byte
 }
 
-// NewReader returns an io.Reader interface to the snappy framed stream format.
-//
-// It transparently handles reading the stream identifier (but does not proxy this
-// to the caller), decompresses blocks, and (optionally) validates checksums.
-//
-// Internally, three buffers are maintained.  The first two are for reading
-// off the wrapped io.Reader and for holding the decompressed block (both are grown
-// automatically and re-used and will never exceed the largest block size, 65536). The
-// last buffer contains the *unread* decompressed bytes (and can grow indefinitely).
-//
-// The second param determines whether or not the reader will verify block
-// checksums and can be enabled/disabled with the constants VerifyChecksum and SkipVerifyChecksum
-//
-// For each Read, the returned length will be up to the lesser of len(b) or 65536
-// decompressed bytes, regardless of the length of *compressed* bytes read
-// from the wrapped io.Reader.
+// NewReader returns an new Reader. Reads from the Reader retreive data
+// decompressed from a snappy framed stream read from r.
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		reader: r,
 
+		// Internally, three buffers are maintained.  The first two are for reading
+		// off the wrapped io.Reader and for holding the decompressed block (both are grown
+		// automatically and re-used and will never exceed the largest block size, 65536). The
+		// last buffer contains the *unread* decompressed bytes (and can grow indefinitely).
 		hdr: make([]byte, 4),
 		src: make([]byte, 4096),
 		dst: make([]byte, 4096),
@@ -82,6 +74,9 @@ func (r *Reader) read(b []byte) (int, error) {
 	return n, err
 }
 
+// Read fills b with any decoded data remaining in the Reader's internal
+// buffers. When buffers are empty the Reader attempts to decode a data chunk
+// from the underlying to fill b with.
 func (r *Reader) Read(b []byte) (int, error) {
 	if r.err != nil {
 		return 0, r.err
