@@ -1,7 +1,10 @@
-// Package snappyframed implements reading and writing of snappy frammed compressed streams.
-//
-// See the snappy repository for details on the framing format.
-//	https://snappy.googlecode.com/svn/trunk/framing_format.txt
+/*
+Package snappyframed implements reading and writing of snappy framed compressed
+streams.
+
+See the snappy repository for details on the framing format.
+https://snappy.googlecode.com/svn/trunk/framing_format.txt
+*/
 package snappyframed
 
 import (
