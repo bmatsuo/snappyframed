@@ -31,7 +31,7 @@ type Reader struct {
 }
 
 // NewReader returns an new Reader. Reads from the Reader retreive data
-// decompressed from a snappy framed stream read from r.
+// decompressed from a snappy framed stream read from sz.
 func NewReader(r io.Reader) *Reader {
 	return &Reader{
 		reader: r,
@@ -49,14 +49,14 @@ func NewReader(r io.Reader) *Reader {
 // WriteTo implements the io.WriterTo interface used by io.Copy.  It writes
 // decoded data from the underlying reader to w.  WriteTo returns the number of
 // bytes written along with any error encountered.
-func (r *Reader) WriteTo(w io.Writer) (int64, error) {
-	n, err := r.buf.WriteTo(w)
+func (sz *Reader) WriteTo(w io.Writer) (int64, error) {
+	n, err := sz.buf.WriteTo(w)
 	if err != nil {
 		return n, err
 	}
 	for {
 		var m int
-		m, err = r.nextFrame(w)
+		m, err = sz.nextFrame(w)
 		n += int64(m)
 		if err != nil {
 			break
@@ -73,44 +73,44 @@ func (r *Reader) WriteTo(w io.Writer) (int64, error) {
 // the reader is equivalent to one returned by NewReader.  Reusing readers with
 // Reset can significantly reduce allocation overhead in applications making
 // heavy use of snappy framed format streams.
-func (r *Reader) Reset(rnew io.Reader) {
-	r.err = nil
-	r.reader = rnew
-	r.buf.Truncate(0)
+func (sz *Reader) Reset(r io.Reader) {
+	sz.err = nil
+	sz.reader = r
+	sz.buf.Truncate(0)
 }
 
-func (r *Reader) read(b []byte) (int, error) {
-	n, err := r.buf.Read(b)
-	r.err = err
+func (sz *Reader) read(b []byte) (int, error) {
+	n, err := sz.buf.Read(b)
+	sz.err = err
 	return n, err
 }
 
 // Read fills b with any decoded data remaining in the Reader's internal
 // buffers. When buffers are empty the Reader attempts to decode a data chunk
 // from the underlying to fill b with.
-func (r *Reader) Read(b []byte) (int, error) {
-	if r.err != nil {
-		return 0, r.err
+func (sz *Reader) Read(b []byte) (int, error) {
+	if sz.err != nil {
+		return 0, sz.err
 	}
 
-	if r.buf.Len() < len(b) {
-		_, r.err = r.nextFrame(&r.buf)
-		if r.err == io.EOF {
+	if sz.buf.Len() < len(b) {
+		_, sz.err = sz.nextFrame(&sz.buf)
+		if sz.err == io.EOF {
 			// fill b with any remaining bytes in the buffer.
-			return r.read(b)
+			return sz.read(b)
 		}
-		if r.err != nil {
-			return 0, r.err
+		if sz.err != nil {
+			return 0, sz.err
 		}
 	}
 
-	return r.read(b)
+	return sz.read(b)
 }
 
-func (r *Reader) nextFrame(w io.Writer) (int, error) {
+func (sz *Reader) nextFrame(w io.Writer) (int, error) {
 	for {
 		// read the 4-byte snappy frame header
-		_, err := io.ReadFull(r.reader, r.hdr)
+		_, err := io.ReadFull(sz.reader, sz.hdr)
 		if err != nil {
 			return 0, err
 		}
@@ -118,25 +118,25 @@ func (r *Reader) nextFrame(w io.Writer) (int, error) {
 		// a stream identifier may appear anywhere and contains no information.
 		// it must appear at the beginning of the stream.  when found, validate
 		// it and continue to the next block.
-		if r.hdr[0] == blockStreamIdentifier {
-			err := r.readStreamID()
+		if sz.hdr[0] == blockStreamIdentifier {
+			err := sz.readStreamID()
 			if err != nil {
 				return 0, err
 			}
-			r.seenStreamID = true
+			sz.seenStreamID = true
 			continue
 		}
-		if !r.seenStreamID {
+		if !sz.seenStreamID {
 			return 0, errMissingStreamID
 		}
 
-		switch typ := r.hdr[0]; {
+		switch typ := sz.hdr[0]; {
 		case typ == blockCompressed || typ == blockUncompressed:
-			return r.decodeBlock(w)
+			return sz.decodeBlock(w)
 		case typ == blockPadding || (0x80 <= typ && typ <= 0xfd):
 			// skip blocks whose data must not be inspected (4.4 Padding, and 4.6
 			// Reserved skippable chunks).
-			err := r.discardBlock()
+			err := sz.discardBlock()
 			if err != nil {
 				return 0, err
 			}
@@ -144,27 +144,27 @@ func (r *Reader) nextFrame(w io.Writer) (int, error) {
 		default:
 			// typ must be unskippable range 0x02-0x7f.  Read the block in full
 			// and return an error (4.5 Reserved unskippable chunks).
-			err = r.discardBlock()
+			err = sz.discardBlock()
 			if err != nil {
 				return 0, err
 			}
-			return 0, fmt.Errorf("unrecognized unskippable frame %#x", r.hdr[0])
+			return 0, fmt.Errorf("unrecognized unskippable frame %#x", sz.hdr[0])
 		}
 	}
 	panic("unreachable")
 }
 
-// decodeDataBlock assumes r.hdr[0] to be either blockCompressed or
+// decodeDataBlock assumes sz.hdr[0] to be either blockCompressed or
 // blockUncompressed.
-func (r *Reader) decodeBlock(w io.Writer) (int, error) {
+func (sz *Reader) decodeBlock(w io.Writer) (int, error) {
 	// read compressed block data and determine if uncompressed data is too
 	// large.
-	buf, err := r.readBlock()
+	buf, err := sz.readBlock()
 	if err != nil {
 		return 0, err
 	}
 	declen := len(buf[4:])
-	if r.hdr[0] == blockCompressed {
+	if sz.hdr[0] == blockCompressed {
 		declen, err = snappy.DecodedLen(buf[4:])
 		if err != nil {
 			return 0, err
@@ -177,12 +177,12 @@ func (r *Reader) decodeBlock(w io.Writer) (int, error) {
 	// decode data and verify its integrity using the little-endian crc32
 	// preceding encoded data
 	crc32le, blockdata := buf[:4], buf[4:]
-	if r.hdr[0] == blockCompressed {
-		r.dst, err = snappy.Decode(r.dst, blockdata)
+	if sz.hdr[0] == blockCompressed {
+		sz.dst, err = snappy.Decode(sz.dst, blockdata)
 		if err != nil {
 			return 0, err
 		}
-		blockdata = r.dst
+		blockdata = sz.dst
 	}
 	checksum := unmaskChecksum(uint32(crc32le[0]) | uint32(crc32le[1])<<8 | uint32(crc32le[2])<<16 | uint32(crc32le[3])<<24)
 	actualChecksum := crc32.Checksum(blockdata, crcTable)
@@ -192,15 +192,15 @@ func (r *Reader) decodeBlock(w io.Writer) (int, error) {
 	return w.Write(blockdata)
 }
 
-func (r *Reader) readStreamID() error {
+func (sz *Reader) readStreamID() error {
 	// the length of the block is fixed so don't decode it from the header.
-	if !bytes.Equal(r.hdr, streamID[:4]) {
+	if !bytes.Equal(sz.hdr, streamID[:4]) {
 		return fmt.Errorf("invalid stream identifier length")
 	}
 
 	// read the identifier block data "sNaPpY"
-	block := r.src[:6]
-	_, err := noeof(io.ReadFull(r.reader, block))
+	block := sz.src[:6]
+	_, err := noeof(io.ReadFull(sz.reader, block))
 	if err != nil {
 		return err
 	}
@@ -210,25 +210,25 @@ func (r *Reader) readStreamID() error {
 	return nil
 }
 
-func (r *Reader) discardBlock() error {
-	length := uint64(decodeLength(r.hdr[1:]))
-	_, err := noeof64(io.CopyN(ioutil.Discard, r.reader, int64(length)))
+func (sz *Reader) discardBlock() error {
+	length := uint64(decodeLength(sz.hdr[1:]))
+	_, err := noeof64(io.CopyN(ioutil.Discard, sz.reader, int64(length)))
 	return err
 }
 
-func (r *Reader) readBlock() ([]byte, error) {
+func (sz *Reader) readBlock() ([]byte, error) {
 	// check bounds on encoded length (+4 for checksum)
-	length := decodeLength(r.hdr[1:])
+	length := decodeLength(sz.hdr[1:])
 	if length > (maxEncodedBlockSize + 4) {
 		return nil, fmt.Errorf("encoded block data too large %d > %d", length, (maxEncodedBlockSize + 4))
 	}
 
-	if int(length) > len(r.src) {
-		r.src = make([]byte, length)
+	if int(length) > len(sz.src) {
+		sz.src = make([]byte, length)
 	}
 
-	buf := r.src[:length]
-	_, err := noeof(io.ReadFull(r.reader, buf))
+	buf := sz.src[:length]
+	_, err := noeof(io.ReadFull(sz.reader, buf))
 	if err != nil {
 		return nil, err
 	}

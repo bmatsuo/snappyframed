@@ -37,24 +37,24 @@ func NewWriter(w io.Writer) *Writer {
 // data read from r as a snappy framed stream and writes the result to the
 // underlying io.Writer.  ReadFrom returns the number number of bytes read,
 // along with any error encountered (other than io.EOF).
-func (w *Writer) ReadFrom(r io.Reader) (int64, error) {
-	if w.err != nil {
-		return 0, w.err
+func (sz *Writer) ReadFrom(r io.Reader) (int64, error) {
+	if sz.err != nil {
+		return 0, sz.err
 	}
 
 	var n int64
-	n, w.err = w.bw.ReadFrom(r)
-	return n, w.err
+	n, sz.err = sz.bw.ReadFrom(r)
+	return n, sz.err
 }
 
-// Reset discards internal state and sets the underlying writer to wnew.  After
-// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reset discards internal state and sets the underlying writer to w.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(w).
 // Reusing writers with Reset can significantly reduce allocation overhead in
 // applications making heavy use of snappy framed format streams.
-func (w *Writer) Reset(wnew io.Writer) {
-	w.err = nil
-	w.w.Reset(wnew)
-	w.bw.Reset(w.w)
+func (sz *Writer) Reset(w io.Writer) {
+	sz.err = nil
+	sz.w.Reset(w)
+	sz.bw.Reset(sz.w)
 }
 
 // Write compresses the bytes of p and writes sequence of encoded chunks to the
@@ -62,14 +62,14 @@ func (w *Writer) Reset(wnew io.Writer) {
 // not be written to the underlying io.Writer by the time Write returns.
 //
 // Write returns 0 if and only if the returned error is non-nil.
-func (w *Writer) Write(p []byte) (int, error) {
-	if w.err != nil {
-		return 0, w.err
+func (sz *Writer) Write(p []byte) (int, error) {
+	if sz.err != nil {
+		return 0, sz.err
 	}
 
-	_, w.err = w.bw.Write(p)
-	if w.err != nil {
-		return 0, w.err
+	_, sz.err = sz.bw.Write(p)
+	if sz.err != nil {
+		return 0, sz.err
 	}
 
 	return len(p), nil
@@ -77,27 +77,27 @@ func (w *Writer) Write(p []byte) (int, error) {
 
 // Flush encodes any (decoded) source data buffered interanally in the Writer
 // and writes a chunk containing the result to the underlying io.Writer.
-func (w *Writer) Flush() error {
-	if w.err == nil {
-		w.err = w.bw.Flush()
+func (sz *Writer) Flush() error {
+	if sz.err == nil {
+		sz.err = sz.bw.Flush()
 	}
 
-	return w.err
+	return sz.err
 }
 
 // Close flushes the Writer and tears down internal data structures.  Close
 // does not close the underlying io.Writer.
-func (w *Writer) Close() error {
-	if w.err != nil {
-		return w.err
+func (sz *Writer) Close() error {
+	if sz.err != nil {
+		return sz.err
 	}
 
-	w.err = w.bw.Flush()
-	if w.err != nil {
-		return w.err
+	sz.err = sz.bw.Flush()
+	if sz.err != nil {
+		return sz.err
 	}
 
-	w.err = errClosed
+	sz.err = errClosed
 	return nil
 }
 
@@ -131,32 +131,32 @@ func newWriter(w io.Writer) *writer {
 	}
 }
 
-// Reset discards internal state and sets the underlying writer to wnew.  After
-// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reset discards internal state and sets the underlying writer to w.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(w).
 // Reusing writers with Reset can significantly reduce allocation overhead in
 // applications making heavy use of snappy framed format streams.
-func (w *writer) Reset(wnew io.Writer) {
-	w.err = nil
-	w.sentStreamID = false
-	w.writer = wnew
+func (sz *writer) Reset(w io.Writer) {
+	sz.err = nil
+	sz.sentStreamID = false
+	sz.writer = w
 }
 
-func (w *writer) Write(p []byte) (int, error) {
-	if w.err != nil {
-		return 0, w.err
+func (sz *writer) Write(p []byte) (int, error) {
+	if sz.err != nil {
+		return 0, sz.err
 	}
 
 	total := 0
-	sz := MaxBlockSize
+	size := MaxBlockSize
 	var n int
 	for i := 0; i < len(p); i += n {
-		if i+sz > len(p) {
-			sz = len(p) - i
+		if i+size > len(p) {
+			size = len(p) - i
 		}
 
-		n, w.err = w.write(p[i : i+sz])
-		if w.err != nil {
-			return 0, w.err
+		n, sz.err = sz.write(p[i : i+size])
+		if sz.err != nil {
+			return 0, sz.err
 		}
 		total += n
 	}
@@ -166,50 +166,50 @@ func (w *writer) Write(p []byte) (int, error) {
 // write attempts to encode p as a block and write it to the underlying writer.
 // The returned int may not equal p's length if compression below
 // MaxBlockSize-4 could not be achieved.
-func (w *writer) write(p []byte) (int, error) {
+func (sz *writer) write(p []byte) (int, error) {
 	var err error
 
 	if len(p) > MaxBlockSize {
 		return 0, errors.New(fmt.Sprintf("block too large %d > %d", len(p), MaxBlockSize))
 	}
 
-	w.dst = w.dst[:cap(w.dst)] // Encode does dumb resize w/o context. reslice avoids alloc.
-	w.dst, err = snappy.Encode(w.dst, p)
+	sz.dst = sz.dst[:cap(sz.dst)] // Encode does dumb resize w/o context. reslice avoids alloc.
+	sz.dst, err = snappy.Encode(sz.dst, p)
 	if err != nil {
 		return 0, err
 	}
-	block := w.dst
+	block := sz.dst
 	n := len(p)
 	compressed := true
 
 	// check for data which is better left uncompressed.  this is determined if
 	// the encoded content is longer than the source.
-	if len(w.dst) >= len(p) {
+	if len(sz.dst) >= len(p) {
 		compressed = false
 		block = p[:n]
 	}
 
-	if !w.sentStreamID {
-		_, err := w.writer.Write(streamID)
+	if !sz.sentStreamID {
+		_, err := sz.writer.Write(streamID)
 		if err != nil {
 			return 0, err
 		}
-		w.sentStreamID = true
+		sz.sentStreamID = true
 	}
 
 	// set the block type
 	if compressed {
-		writeHeader(w.hdr, blockCompressed, block, p[:n])
+		writeHeader(sz.hdr, blockCompressed, block, p[:n])
 	} else {
-		writeHeader(w.hdr, blockUncompressed, block, p[:n])
+		writeHeader(sz.hdr, blockUncompressed, block, p[:n])
 	}
 
-	_, err = w.writer.Write(w.hdr)
+	_, err = sz.writer.Write(sz.hdr)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = w.writer.Write(block)
+	_, err = sz.writer.Write(block)
 	if err != nil {
 		return 0, err
 	}
