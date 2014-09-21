@@ -88,6 +88,9 @@ func (sz *Reader) read(b []byte) (int, error) {
 // Read fills b with any decoded data remaining in the Reader's internal
 // buffers. When buffers are empty the Reader attempts to decode a data chunk
 // from the underlying to fill b with.
+//
+// Read returns an error if the first chunk encountered in the underlying
+// reader is not a snappy-framed stream identifier.
 func (sz *Reader) Read(b []byte) (int, error) {
 	if sz.err != nil {
 		return 0, sz.err

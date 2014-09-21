@@ -21,7 +21,8 @@ type Writer struct {
 }
 
 // NewWriter returns a new Writer.  Data written to the returned Writer is
-// compressed and written to w.
+// compressed and written to w.  Before the first compressed chunked is written
+// a snappy-framed stream identifier block is written to w.
 //
 // The caller is responsible for calling Flush or Close after all writes have
 // completed to guarantee all data has been encoded and written to w.
