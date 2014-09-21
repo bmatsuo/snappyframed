@@ -47,6 +47,16 @@ func (w *Writer) ReadFrom(r io.Reader) (int64, error) {
 	return n, w.err
 }
 
+// Reset discards internal state and sets the underlying writer to wnew.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reusing writers with Reset can significantly reduce allocation overhead in
+// applications making heavy use of snappy framed format streams.
+func (w *Writer) Reset(wnew io.Writer) {
+	w.err = nil
+	w.w.Reset(wnew)
+	w.bw.Reset(w.w)
+}
+
 // Write compresses the bytes of p and writes sequence of encoded chunks to the
 // underlying io.Writer.  A chunked containing the compressed bytes of p may
 // not be written to the underlying io.Writer by the time Write returns.
@@ -83,9 +93,6 @@ func (w *Writer) Close() error {
 	}
 
 	w.err = w.bw.Flush()
-	w.w = nil
-	w.bw = nil
-
 	if w.err != nil {
 		return w.err
 	}
@@ -122,6 +129,16 @@ func newWriter(w io.Writer) *writer {
 		hdr: make([]byte, 8),
 		dst: make([]byte, 4096),
 	}
+}
+
+// Reset discards internal state and sets the underlying writer to wnew.  After
+// Reset returns the writer is equivalent to one returned by NewWriter(wnew).
+// Reusing writers with Reset can significantly reduce allocation overhead in
+// applications making heavy use of snappy framed format streams.
+func (w *writer) Reset(wnew io.Writer) {
+	w.err = nil
+	w.sentStreamID = false
+	w.writer = wnew
 }
 
 func (w *writer) Write(p []byte) (int, error) {
