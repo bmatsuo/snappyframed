@@ -23,13 +23,13 @@ const MediaType = "application/x-snappy-framed"
 // requests containing a snappy framed entity body.
 const ContentEncoding = "x-snappy-framed"
 
-// MaxBlockSize is the maximum number of decoded bytes allowed to be
+// maxBlockSize is the maximum number of decoded bytes allowed to be
 // represented in a snappy framed block (sections 4.2 and 4.3).
-const MaxBlockSize = 65536
+const maxBlockSize = 65536
 
 // maxEncodedBlockSize is the maximum number of encoded bytes in a framed
 // block.
-var maxEncodedBlockSize = uint32(snappy.MaxEncodedLen(MaxBlockSize))
+var maxEncodedBlockSize = uint32(snappy.MaxEncodedLen(maxBlockSize))
 
 // Block types defined by the snappy framed format specification.
 const (

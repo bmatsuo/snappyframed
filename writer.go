@@ -29,7 +29,7 @@ func NewWriter(w io.Writer) *Writer {
 	sz := newWriter(w)
 	return &Writer{
 		w:  sz,
-		bw: bufio.NewWriterSize(sz, MaxBlockSize),
+		bw: bufio.NewWriterSize(sz, maxBlockSize),
 	}
 }
 
@@ -114,8 +114,8 @@ type writer struct {
 // newWriter returns an io.Writer that writes its input to an underlying
 // io.Writer encoded as a snappy framed stream.  A stream identifier block is
 // written to w preceding the first data block.  The returned writer will never
-// emit a block with length in bytes greater than MaxBlockSize+4 nor one
-// containing more than MaxBlockSize bytes of (uncompressed) data.
+// emit a block with length in bytes greater than maxBlockSize+4 nor one
+// containing more than maxBlockSize bytes of (uncompressed) data.
 //
 // For each Write, the returned length will only ever be len(p) or 0,
 // regardless of the length of *compressed* bytes written to the wrapped
@@ -147,7 +147,7 @@ func (sz *writer) Write(p []byte) (int, error) {
 	}
 
 	total := 0
-	size := MaxBlockSize
+	size := maxBlockSize
 	var n int
 	for i := 0; i < len(p); i += n {
 		if i+size > len(p) {
@@ -165,12 +165,12 @@ func (sz *writer) Write(p []byte) (int, error) {
 
 // write attempts to encode p as a block and write it to the underlying writer.
 // The returned int may not equal p's length if compression below
-// MaxBlockSize-4 could not be achieved.
+// maxBlockSize-4 could not be achieved.
 func (sz *writer) write(p []byte) (int, error) {
 	var err error
 
-	if len(p) > MaxBlockSize {
-		return 0, errors.New(fmt.Sprintf("block too large %d > %d", len(p), MaxBlockSize))
+	if len(p) > maxBlockSize {
+		return 0, errors.New(fmt.Sprintf("block too large %d > %d", len(p), maxBlockSize))
 	}
 
 	sz.dst = sz.dst[:cap(sz.dst)] // Encode does dumb resize w/o context. reslice avoids alloc.

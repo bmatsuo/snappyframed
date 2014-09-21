@@ -44,7 +44,7 @@ func TestReader_skippable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
-	writepad(0xfe, MaxBlockSize) // normal padding
+	writepad(0xfe, maxBlockSize) // normal padding
 	if err != nil {
 		t.Fatalf("write error: %v", err)
 	}
@@ -173,26 +173,26 @@ func TestReader_maxSkippable(t *testing.T) {
 // TestReader_maxBlock validates bounds checking on encoded and decoded data
 // (4.2 Compressed Data).
 func TestReader_maxBlock(t *testing.T) {
-	// decompressing a block with compressed length greater than MaxBlockSize
+	// decompressing a block with compressed length greater than maxBlockSize
 	// should succeed.
 	buf := bytes.NewReader(bytes.Join([][]byte{
 		streamID,
-		compressedChunkGreaterN(t, MaxBlockSize),
+		compressedChunkGreaterN(t, maxBlockSize),
 	}, nil))
 	r := NewReader(buf)
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(b) != MaxBlockSize {
+	if len(b) != maxBlockSize {
 		t.Fatalf("bad read (%d bytes)", len(b))
 	}
 
 	// decompressing should fail if the block with decompressed length greater
-	// than MaxBlockSize.
+	// than maxBlockSize.
 	buf = bytes.NewReader(bytes.Join([][]byte{
 		streamID,
-		compressedChunk(t, make([]byte, MaxBlockSize+1)),
+		compressedChunk(t, make([]byte, maxBlockSize+1)),
 	}, nil))
 	r = NewReader(buf)
 	b, err = ioutil.ReadAll(r)

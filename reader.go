@@ -170,8 +170,8 @@ func (sz *Reader) decodeBlock(w io.Writer) (int, error) {
 			return 0, err
 		}
 	}
-	if declen > MaxBlockSize {
-		return 0, fmt.Errorf("decoded block data too large %d > %d", declen, MaxBlockSize)
+	if declen > maxBlockSize {
+		return 0, fmt.Errorf("decoded block data too large %d > %d", declen, maxBlockSize)
 	}
 
 	// decode data and verify its integrity using the little-endian crc32
