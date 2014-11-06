@@ -124,3 +124,41 @@ func TestWriterFlush(t *testing.T) {
 		t.Fatalf("unexpected bytes")
 	}
 }
+
+func TestWriterReset(t *testing.T) {
+	data := []byte("hello reset")
+	var buf1 bytes.Buffer
+	var buf2 bytes.Buffer
+
+	w := NewWriter(&buf1)
+	_, err := w.Write(data)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	w.Reset(&buf2)
+	_, err = w.Write(data)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	err = w.Close()
+	if err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	b1 := buf1.Bytes()
+	b2 := buf2.Bytes()
+
+	if len(b1) != 0 {
+		t.Errorf("buffer 1: %q", b1)
+	}
+
+	b2r := NewReader(bytes.NewReader(b2))
+	b2dec, err := ioutil.ReadAll(b2r)
+	if err != nil {
+		t.Errorf("buffer 2: %v", err)
+	} else if !bytes.Equal(b2dec, data) {
+		t.Errorf("buffer 2: %q", b2)
+	}
+}

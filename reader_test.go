@@ -551,3 +551,39 @@ func TestReaderWriteTo(t *testing.T) {
 		t.Fatalf("decode: %q", decmsg)
 	}
 }
+
+func TestReaderReset(t *testing.T) {
+	data := []byte("hello reset")
+	var buf bytes.Buffer
+	w := newWriter(&buf)
+	_, err := w.Write(data)
+	if err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	enc := buf.Bytes()
+	r := NewReader(bytes.NewReader(enc))
+	p := make([]byte, 5)
+
+	n, err := r.Read(p)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if n != len(p) {
+		t.Fatalf("short read: %d (!= %d)", n, len(p))
+	}
+	if !bytes.Equal(p, data[:n]) {
+		t.Fatalf("bad read: %q (!= %q)", p, data[:n])
+	}
+
+	r.Reset(bytes.NewReader(enc))
+	n, err = r.Read(p)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if n != len(p) {
+		t.Fatalf("short read: %d (!= %d)", n, len(p))
+	}
+	if !bytes.Equal(p, data[:n]) {
+		t.Fatalf("bad read: %q (!= %q)", p, data[:n])
+	}
+}
