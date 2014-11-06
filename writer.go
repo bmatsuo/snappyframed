@@ -59,8 +59,9 @@ func (sz *Writer) Reset(w io.Writer) {
 }
 
 // Write compresses the bytes of p and writes sequence of encoded chunks to the
-// underlying io.Writer.  A chunked containing the compressed bytes of p may
-// not be written to the underlying io.Writer by the time Write returns.
+// underlying io.Writer.  Because decompressed data is buffered internally
+// before encoding calls to Write may not always result in data being written
+// to the underlying io.Writer.
 //
 // Write returns 0 if and only if the returned error is non-nil.
 func (sz *Writer) Write(p []byte) (int, error) {

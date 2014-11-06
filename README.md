@@ -4,8 +4,6 @@
 Status](https://secure.travis-ci.org/bmatsuo/snappyframed.png?branch=master)](http://travis-ci.org/bmatsuo/snappyframed)
 [![GoDoc](https://godoc.org/github.com/bmatsuo/snappyframed?status.svg)](https://godoc.org/github.com/bmatsuo/snappyframed)
 
-This package is experimental and its API is subject to change.
-
 This is a fork of the
 [go-snappystream](https://github.com/mreiferson/ga-snappystream) package.  It
 has a cleaner interface and extra optimization.
