@@ -13,8 +13,8 @@ against backwards incompatible changes (of which no further are anticipated),
 you should the [gopkg.in](http://gopkg.in/bmatsuo/snappyframed.v1) import path,
 "gopkg.in/bmatsuo/snappyframed.v1".
 
-This package wraps [snappy-go][1] and supplies a `Reader` and `Writer` for the
-snappy [framed stream format][2].
+This package wraps [snappy][1] and supplies a buffered `Reader` and `Writer`
+for the snappy [framed stream format][2].
 
-[1]: https://code.google.com/p/snappy-go/
-[2]: https://snappy.googlecode.com/svn/trunk/framing_format.txt
+[1]: https://github.com/golang/snappy
+[2]: https://github.com/google/snappy/blob/master/framing_format.txt
