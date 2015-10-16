@@ -10,7 +10,7 @@ package snappyframed
 import (
 	"hash/crc32"
 
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/golang/snappy"
 )
 
 // Ext is the file extension for files whose content is a snappy framed stream.

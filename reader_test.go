@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/golang/snappy"
 )
 
 // This test checks that padding and reserved skippable blocks are ignored by
@@ -443,11 +443,7 @@ func compressedChunkGreaterN(t *testing.T, n int) []byte {
 			t.Errorf("crypto/rand: bad read (%d bytes)", nrd)
 			return nil
 		}
-		encoded, err = snappy.Encode(encoded[:cap(encoded)], decoded)
-		if err != nil {
-			t.Errorf("snappy: %v", err)
-			return nil
-		}
+		encoded = snappy.Encode(encoded[:cap(encoded)], decoded)
 	}
 	if len(encoded) <= n {
 		t.Error(errNotEnoughEntropy)
@@ -461,11 +457,7 @@ func compressedChunkGreaterN(t *testing.T, n int) []byte {
 // block. compressedChunk can encode source data larger than allowed in the
 // specification.
 func compressedChunk(t *testing.T, src []byte) []byte {
-	encoded, err := snappy.Encode(nil, src)
-	if err != nil {
-		t.Errorf("snappy: %v", err)
-		return nil
-	}
+	encoded := snappy.Encode(nil, src)
 
 	if len(encoded) > (1<<24)-5 { // account for the 4-byte checksum
 		t.Errorf("block data too large %d", len(src))

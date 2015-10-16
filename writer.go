@@ -7,7 +7,7 @@ import (
 	"hash/crc32"
 	"io"
 
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/golang/snappy"
 )
 
 var errClosed = fmt.Errorf("closed")
@@ -176,10 +176,7 @@ func (sz *writer) write(p []byte) (int, error) {
 	}
 
 	sz.dst = sz.dst[:cap(sz.dst)] // Encode does dumb resize w/o context. reslice avoids alloc.
-	sz.dst, err = snappy.Encode(sz.dst, p)
-	if err != nil {
-		return 0, err
-	}
+	sz.dst = snappy.Encode(sz.dst, p)
 	block := sz.dst
 	n := len(p)
 	compressed := true
